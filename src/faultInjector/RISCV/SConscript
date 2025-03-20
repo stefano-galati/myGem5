@@ -1,0 +1,4 @@
+Import('*')
+
+SimObject('RegisterFaultInjector.py', sim_objects=['RegisterFaultInjector'])
+Source('register_fault_injector.cc')
