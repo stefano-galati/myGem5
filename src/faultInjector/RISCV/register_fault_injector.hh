@@ -13,6 +13,8 @@ namespace gem5
             int getNumber(void);
             std::string getString(void);
 
+            static std::string readFromFile(std::string filename);
+
         private:
             std::string input_file;
             int number;

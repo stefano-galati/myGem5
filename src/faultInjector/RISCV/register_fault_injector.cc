@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 
 #include "register_fault_injector.hh"
@@ -21,6 +22,26 @@ namespace gem5 {
 
     int RegisterFaultInjector::getNumber(void){
         return this->number;
+    }
+
+    //no need to specify again static
+    std::string RegisterFaultInjector::readFromFile
+    (std::string filename){
+        std::ifstream file(filename);
+
+        if (!file){
+            std::cout << "Error reading the file";
+            return "Error";
+        }
+
+        std::string lines = "", line;
+
+        while (std::getline(file, line)){
+            lines += line;
+        }
+
+        file.close();
+        return lines;
     }
 
 }

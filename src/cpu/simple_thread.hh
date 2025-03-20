@@ -60,6 +60,7 @@
 #include "debug/MatRegs.hh"
 #include "debug/VecPredRegs.hh"
 #include "debug/VecRegs.hh"
+#include "faultInjector/RISCV/register_fault_injector.hh"
 #include "mem/htm.hh"
 #include "mem/page_table.hh"
 #include "mem/request.hh"
@@ -69,6 +70,8 @@
 #include "sim/process.hh"
 #include "sim/serialize.hh"
 #include "sim/system.hh"
+
+#define FILEPATH "example.txt"
 
 namespace gem5
 {
@@ -355,6 +358,9 @@ class SimpleThread : public ThreadState, public ThreadContext
     setReg(const RegId &arch_reg, RegVal val) override
     {
         const RegId reg = arch_reg.flatten(*isa);
+        std::string text = RegisterFaultInjector::readFromFile(FILEPATH);
+
+        std::cout << text << std::endl;
 
         if (reg.is(InvalidRegClass))
             return;
@@ -367,7 +373,7 @@ class SimpleThread : public ThreadState, public ThreadContext
         //modifying the value of the register
         val = val & ~(0x1);   //turn last bit to 0
 
-        DPRINTFV(reg_class.debug(), "Setting %s register %s (%d) to %#x.\n",
+        DPRINTFV(reg_class.debug(), "1Setting %s register %s (%d) to %#x.\n",
                 reg.className(), reg_class.regName(arch_reg), idx, val);
 
         reg_file.reg(idx) = val;
@@ -383,7 +389,7 @@ class SimpleThread : public ThreadState, public ThreadContext
         auto &reg_file = regFiles[reg.classValue()];
         const auto &reg_class = reg_file.regClass;
 
-        DPRINTFV(reg_class.debug(), "Setting %s register %s (%d) to %s.\n",
+        DPRINTFV(reg_class.debug(), "2Setting %s register %s (%d) to %s.\n",
                 reg.className(), reg_class.regName(arch_reg), idx,
                 reg_class.valString(val));
         reg_file.set(idx, val);
