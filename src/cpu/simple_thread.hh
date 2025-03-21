@@ -71,7 +71,8 @@
 #include "sim/serialize.hh"
 #include "sim/system.hh"
 
-#define FILEPATH "example.txt"
+#define FILEPATH "registerMasks.txt"
+#define NUMREGS 32
 
 namespace gem5
 {
@@ -113,6 +114,12 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     /** True if the memory access should be skipped for this instruction */
     bool memAccPredicate;
+
+    //array of masks read from file
+    std::vector<unsigned int> masks;
+
+    //so that the file is read only once
+    bool fileAlreadyRead = false;
 
   public:
     std::string
@@ -357,24 +364,35 @@ class SimpleThread : public ThreadState, public ThreadContext
     void
     setReg(const RegId &arch_reg, RegVal val) override
     {
+        RegVal mask;    //uint64_t
         const RegId reg = arch_reg.flatten(*isa);
-        std::string text = RegisterFaultInjector::readFromFile(FILEPATH);
 
-        std::cout << text << std::endl;
+        //std::string text = RegisterFaultInjector::readFromFile(FILEPATH);
+        //std::cout << text << std::endl;
+
+        if (!fileAlreadyRead){
+            masks = RegisterFaultInjector::readMasks(FILEPATH, NUMREGS);
+            fileAlreadyRead = true;
+        }
 
         if (reg.is(InvalidRegClass))
             return;
 
         const RegIndex idx = reg.index();
+        mask = static_cast<RegVal>(masks[idx]);
 
         auto &reg_file = regFiles[reg.classValue()];
         const auto &reg_class = reg_file.regClass;
 
         //modifying the value of the register
-        val = val & ~(0x1);   //turn last bit to 0
+        val = val & ~mask;
 
-        DPRINTFV(reg_class.debug(), "1Setting %s register %s (%d) to %#x.\n",
-                reg.className(), reg_class.regName(arch_reg), idx, val);
+        //std::cout << "Mask before: " << std::hex << mask
+        //    << ", mask after" << std::hex << ~mask << std::endl;
+
+        DPRINTFV(reg_class.debug(), "1Setting %s register %s (%d) to 0x%lx \
+                 with mask 0x%lx.\n",
+                reg.className(), reg_class.regName(arch_reg), idx, val, mask);
 
         reg_file.reg(idx) = val;
     }

@@ -8,7 +8,8 @@ namespace gem5 {
     RegisterFaultInjector::RegisterFaultInjector
         (const RegisterFaultInjectorParams &params) :
         SimObject(params),
-        input_file(params.inputFile)   //initialization list
+        input_file(params.inputFile),
+        number(params.number)   //initialization list
         {
             //std::cout << "Hello world, from a SimObject!" <<std::endl;
             std::cout << "Hey, I have a parameter: "
@@ -42,6 +43,44 @@ namespace gem5 {
 
         file.close();
         return lines;
+    }
+
+    std::vector<unsigned int> RegisterFaultInjector::readMasks
+    (std::string filename, int size){
+        std::vector<unsigned int> arr(size, 0);
+
+        std::ifstream file(filename);
+        std::string word;
+
+        /*
+        The file should be organized as a N * 2 matrix, where
+        the first column is the id of the register and
+        the second column is the mask corresponding to that specific register
+        No need to specify a mask to all the registers.
+        This file has to be stored in the same folder of the
+        script calling the gem5.opt
+        At this moment, the file has to be named "registerMasks.txt"
+        */
+
+
+        if (!file){
+            std::cout << "Error reading the file";
+            return arr;
+        }
+
+        std::cout << "Reading masks from file..." << std::endl;
+
+        while (file >> word){
+            //std::cout << word << std::endl;
+            int index = std::stoi(word);
+            file >> word;
+            //std::cout << "Also: " << word << std::endl;
+            int mask = std::stoi(word, 0, 16);
+
+            arr[index] = mask;
+        }
+
+        return arr;
     }
 
 }
