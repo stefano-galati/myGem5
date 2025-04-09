@@ -116,7 +116,7 @@ class SimpleThread : public ThreadState, public ThreadContext
     bool memAccPredicate;
 
     //array of masks read from file
-    std::vector<unsigned int> masks;
+    std::vector<unsigned int> masksST0, masksST1, masksBITFLIP;
 
     //so that the file is read only once
     bool fileAlreadyRead = false;
@@ -366,33 +366,62 @@ class SimpleThread : public ThreadState, public ThreadContext
     {
         RegVal mask;    //uint64_t
         const RegId reg = arch_reg.flatten(*isa);
-
-        //std::string text = RegisterFaultInjector::readFromFile(FILEPATH);
-        //std::cout << text << std::endl;
+        std::string type;
 
         if (!fileAlreadyRead){
-            masks = RegisterFaultInjector::readMasks(FILEPATH, NUMREGS);
+            masksST0 = RegisterFaultInjector::readMasks(FILEPATH, NUMREGS, 0);
+            masksST1 = RegisterFaultInjector::readMasks(FILEPATH, NUMREGS, 1);
+            masksBITFLIP = RegisterFaultInjector
+                ::readMasks(FILEPATH, NUMREGS, 2);
             fileAlreadyRead = true;
+
+            //test
+            for (int i=0; i<NUMREGS; i++){
+                if (masksST0[i]!=0)  std::cout << i << "->ST0" << std::endl;
+                if (masksST1[i]!=0)  std::cout << i << "->ST1" << std::endl;
+                if (masksBITFLIP[i]!=0)  std::cout << i
+                    << "->BITFLIP" << std::endl;
+            }
         }
 
         if (reg.is(InvalidRegClass))
             return;
 
         const RegIndex idx = reg.index();
-        mask = static_cast<RegVal>(masks[idx]);
+        if (masksST0[idx]!=0){
+            mask = static_cast<RegVal>(masksST0[idx]);
+            //set bits to 0
+            type="ST0";
+            val = val & ~mask;
+        }
+        else if (masksST1[idx]!=0){
+            mask = static_cast<RegVal>(masksST1[idx]);
+            //set bits to 1
+            type="ST1";
+            val = val | mask;
+        }
+        else if (masksBITFLIP[idx]!=0){
+            mask = static_cast<RegVal>(masksBITFLIP[idx]);
+            //bitflip
+            type="BITFLIP";
+            val = val ^ mask;
+        }
+        //ST0 has priority, but we suppose that the input file cannot have
+        //two different masks/types associated to the same register
+        //Only ONE of the previous three conditions is TRUE
 
         auto &reg_file = regFiles[reg.classValue()];
         const auto &reg_class = reg_file.regClass;
 
-        //modifying the value of the register
-        val = val & ~mask;
+
 
         //std::cout << "Mask before: " << std::hex << mask
         //    << ", mask after" << std::hex << ~mask << std::endl;
 
         DPRINTFV(reg_class.debug(), "1Setting %s register %s (%d) to 0x%lx \
-                 with mask 0x%lx.\n",
-                reg.className(), reg_class.regName(arch_reg), idx, val, mask);
+                 with mask 0x%lx (%d).\n",
+                reg.className(), reg_class.regName(arch_reg),
+                idx, val, mask, type);
 
         reg_file.reg(idx) = val;
     }

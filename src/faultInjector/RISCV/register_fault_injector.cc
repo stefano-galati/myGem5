@@ -46,7 +46,7 @@ namespace gem5 {
     }
 
     std::vector<unsigned int> RegisterFaultInjector::readMasks
-    (std::string filename, int size){
+    (std::string filename, int size, int type){
         std::vector<unsigned int> arr(size, 0);
 
         std::ifstream file(filename);
@@ -77,7 +77,17 @@ namespace gem5 {
             //std::cout << "Also: " << word << std::endl;
             int mask = std::stoi(word, 0, 16);
 
-            arr[index] = mask;
+            file >> word;
+            if (type==0 && word=="ST0"){
+                arr[index] = mask;
+            }
+            if (type==1 && word=="ST1"){
+                arr[index] = mask;
+            }
+            if (type==2 && word=="BITFLIP"){
+                arr[index] = mask;
+            }
+
         }
 
         return arr;

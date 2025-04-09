@@ -15,7 +15,7 @@ namespace gem5
 
             static std::string readFromFile(std::string filename);
             static std::vector<unsigned int>
-                readMasks(std::string filename, int size);
+                readMasks(std::string filename, int size, int type);
 
         private:
             std::string input_file;
