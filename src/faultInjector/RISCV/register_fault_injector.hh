@@ -1,6 +1,8 @@
 #ifndef __REGISTER_FAULT_INJECTOR_HH__
 #define __REGISTER_FAULT_INJECTOR_HH__
 
+#include <list>
+
 #include "params/RegisterFaultInjector.hh"
 #include "sim/sim_object.hh"
 
@@ -16,6 +18,8 @@ namespace gem5
             static std::string readFromFile(std::string filename);
             static std::vector<unsigned int>
                 readMasks(std::string filename, int size, int type);
+            static std::list<unsigned long>
+                readTimeIntervals(std::string filename);
 
         private:
             std::string input_file;

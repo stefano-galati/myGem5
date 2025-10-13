@@ -56,6 +56,7 @@
 #include "base/atomicio.hh"
 #include "base/cprintf.hh"
 #include "base/logging.hh"
+#include "base/statistics.hh"
 #include "sim/async.hh"
 #include "sim/backtrace.hh"
 #include "sim/eventq.hh"
@@ -149,6 +150,9 @@ void
 abortHandler(int sigtype)
 {
     const EventQueue *const eq(curEventQueue());
+    std::cout << "Dumping statistics..." << std::endl;
+    statistics::dump();
+
     if (eq) {
         ccprintf(std::cerr, "Program aborted at tick %llu\n",
                 eq->getCurTick());

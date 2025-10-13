@@ -31,7 +31,7 @@ namespace gem5 {
         std::ifstream file(filename);
 
         if (!file){
-            std::cout << "Error reading the file";
+            std::cout << "Error reading the file" << std::endl;
             return "Error";
         }
 
@@ -64,7 +64,9 @@ namespace gem5 {
 
 
         if (!file){
-            std::cout << "Error reading the file";
+            std::cout << "Error reading the file registerMasks.txt"
+                << std::endl;
+
             return arr;
         }
 
@@ -91,6 +93,38 @@ namespace gem5 {
         }
 
         return arr;
+    }
+
+
+    std::list<unsigned long>
+        RegisterFaultInjector::readTimeIntervals(std::string filename){
+
+        std::ifstream file(filename);
+        std::string word;
+        std::list<unsigned long> timeIntervals;
+
+        /*
+        The file should be organized as list of time instants (ticks).
+        Supposing that the first line is line 1, the odd lines are the
+        lower bounds of the intervals, while the even lines are the
+        upper bounds.
+        At this moment, the file has to be named "faultTimeIntervals.txt"
+        */
+
+
+        if (!file){
+            std::cout << "Error reading the file faultTimeIntervals.txt"
+                << std::endl;
+            return timeIntervals;
+        }
+
+        std::cout << "Reading time intervals from file..." << std::endl;
+
+        while (file >> word){
+            timeIntervals.push_back(std::stol(word));
+        }
+
+        return timeIntervals;
     }
 
 }

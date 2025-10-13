@@ -43,6 +43,7 @@
 #define __CPU_SIMPLE_THREAD_HH__
 
 #include <algorithm>
+#include <list>
 #include <vector>
 
 #include "arch/generic/htm.hh"
@@ -65,13 +66,15 @@
 #include "mem/page_table.hh"
 #include "mem/request.hh"
 #include "sim/byteswap.hh"
+#include "sim/cur_tick.hh"
 #include "sim/eventq.hh"
 #include "sim/full_system.hh"
 #include "sim/process.hh"
 #include "sim/serialize.hh"
 #include "sim/system.hh"
 
-#define FILEPATH "registerMasks.txt"
+#define REGISTERMASKSFILE "registerMasks.txt"
+#define TIMEINTERVALSFILE "faultTimeIntervals.txt"
 #define NUMREGS 32
 
 namespace gem5
@@ -118,8 +121,14 @@ class SimpleThread : public ThreadState, public ThreadContext
     //array of masks read from file
     std::vector<unsigned int> masksST0, masksST1, masksBITFLIP;
 
-    //so that the file is read only once
-    bool fileAlreadyRead = false;
+    //list of time intervals
+    std::list<unsigned long> timeIntervals;
+
+    //true if static fault injection (TIMEINTERVALSFILE empty or not present)
+    bool noTimeIntervals = true;
+
+    //so that the files is read only once
+    bool filesAlreadyRead = false;
 
   public:
     std::string
@@ -367,13 +376,28 @@ class SimpleThread : public ThreadState, public ThreadContext
         RegVal mask;    //uint64_t
         const RegId reg = arch_reg.flatten(*isa);
         std::string type;
+        static unsigned long minTicks=0, maxTicks=0;
 
-        if (!fileAlreadyRead){
-            masksST0 = RegisterFaultInjector::readMasks(FILEPATH, NUMREGS, 0);
-            masksST1 = RegisterFaultInjector::readMasks(FILEPATH, NUMREGS, 1);
+        //read masks and fault time intervals from file
+        if (!filesAlreadyRead){
+            std::cout << "Reading time intervals..." << std::endl;
+            timeIntervals = RegisterFaultInjector
+                ::readTimeIntervals(TIMEINTERVALSFILE);
+            std::cout << "Reading ST0 masks..." << std::endl;
+            masksST0 = RegisterFaultInjector
+                ::readMasks(REGISTERMASKSFILE, NUMREGS, 0);
+            std::cout << "Reading ST1 masks..." << std::endl;
+            masksST1 = RegisterFaultInjector
+                ::readMasks(REGISTERMASKSFILE, NUMREGS, 1);
+            std::cout << "Reading BITFLIP masks..." << std::endl;
             masksBITFLIP = RegisterFaultInjector
-                ::readMasks(FILEPATH, NUMREGS, 2);
-            fileAlreadyRead = true;
+                ::readMasks(REGISTERMASKSFILE, NUMREGS, 2);
+            filesAlreadyRead = true;
+
+            if (!timeIntervals.empty()){
+                noTimeIntervals=false;
+                std::cout << "List of time intervals NOT empty" << std::endl;
+            }
 
             //test
             for (int i=0; i<NUMREGS; i++){
@@ -387,28 +411,55 @@ class SimpleThread : public ThreadState, public ThreadContext
         if (reg.is(InvalidRegClass))
             return;
 
+        mask=0;
         const RegIndex idx = reg.index();
-        if (masksST0[idx]!=0){
-            mask = static_cast<RegVal>(masksST0[idx]);
-            //set bits to 0
-            type="ST0";
-            val = val & ~mask;
+
+        if (noTimeIntervals || (curTick() >= minTicks
+            && curTick() < maxTicks) ){
+            //fault injection
+            if (masksST0[idx]!=0){
+                mask = static_cast<RegVal>(masksST0[idx]);
+                //set bits to 0
+                type="ST0";
+                val = val & ~mask;
+            }
+            else if (masksST1[idx]!=0){
+                mask = static_cast<RegVal>(masksST1[idx]);
+                //set bits to 1
+                type="ST1";
+                val = val | mask;
+            }
+            else if (masksBITFLIP[idx]!=0){
+                mask = static_cast<RegVal>(masksBITFLIP[idx]);
+                //bitflip
+                type="BITFLIP";
+                val = val ^ mask;
+            }
+            //ST0 has priority, but we suppose that the input file cannot have
+            //two different masks/types associated to the same register
+            //Only ONE of the previous three conditions is TRUE
         }
-        else if (masksST1[idx]!=0){
-            mask = static_cast<RegVal>(masksST1[idx]);
-            //set bits to 1
-            type="ST1";
-            val = val | mask;
+        else{
+            //this operation is not performed if noTimeIntervals=true
+            if (curTick() >= maxTicks){
+                //update values of minTicks and maxTicks
+
+                if (!timeIntervals.empty()){
+                    minTicks = timeIntervals.front();
+                    std::cout << "minTicks: " << minTicks;
+                    timeIntervals.pop_front();
+                    if (!timeIntervals.empty()){
+                        maxTicks = timeIntervals.front();
+                        std::cout << " maxTicks: " << maxTicks << std::endl;
+                        timeIntervals.pop_front();
+                    }
+                    else{
+                        std::cout << "Time intervals list did not \
+                        contain an even number of elements" << std::endl;
+                    }
+                }
+            }
         }
-        else if (masksBITFLIP[idx]!=0){
-            mask = static_cast<RegVal>(masksBITFLIP[idx]);
-            //bitflip
-            type="BITFLIP";
-            val = val ^ mask;
-        }
-        //ST0 has priority, but we suppose that the input file cannot have
-        //two different masks/types associated to the same register
-        //Only ONE of the previous three conditions is TRUE
 
         auto &reg_file = regFiles[reg.classValue()];
         const auto &reg_class = reg_file.regClass;
