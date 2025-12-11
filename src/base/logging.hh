@@ -51,6 +51,8 @@
 namespace gem5
 {
 
+void fatal_stats_dump();
+
 class Logger
 {
   public:
@@ -185,7 +187,10 @@ class Logger
  *
  * @ingroup api_logger
  */
-#define panic(...) exit_message(::gem5::Logger::getPanic(), __VA_ARGS__)
+#define panic(...) \
+    (gem5::fatal_stats_dump(), \
+    exit_message(::gem5::Logger::getPanic(), __VA_ARGS__))
+
 
 /**
  * This implements a cprintf based fatal() function.  fatal() should
@@ -197,7 +202,11 @@ class Logger
  *
  * @ingroup api_logger
  */
-#define fatal(...) exit_message(::gem5::Logger::getFatal(), __VA_ARGS__)
+
+#define fatal(...) \
+    (gem5::fatal_stats_dump(), \
+    exit_message(::gem5::Logger::getFatal(), __VA_ARGS__))
+
 
 /**
  * Conditional panic macro that checks the supplied condition and only panics
