@@ -118,17 +118,22 @@ class SimpleThread : public ThreadState, public ThreadContext
     /** True if the memory access should be skipped for this instruction */
     bool memAccPredicate;
 
+    // the following elements are declared "mutable" because they are being
+    // modified by a const method
+
     //array of masks read from file
-    std::vector<unsigned int> masksST0, masksST1, masksBITFLIP;
+    mutable std::vector<unsigned int> masksST0, masksST1, masksBITFLIP;
 
     //list of time intervals
-    std::list<unsigned long> timeIntervals;
+    mutable std::list<unsigned long> timeIntervals;
 
     //true if static fault injection (TIMEINTERVALSFILE empty or not present)
-    bool noTimeIntervals = true;
+    mutable bool noTimeIntervals = true;
 
     //so that the files is read only once
-    bool filesAlreadyRead = false;
+    mutable bool filesAlreadyRead = false;
+
+
 
   public:
     std::string
@@ -331,50 +336,12 @@ class SimpleThread : public ThreadState, public ThreadContext
     RegVal
     getReg(const RegId &arch_reg) const override
     {
-        const RegId reg = arch_reg.flatten(*isa);
-
-        const RegIndex idx = reg.index();
-
-        const auto &reg_file = regFiles[reg.classValue()];
-        const auto &reg_class = reg_file.regClass;
-
-        RegVal val = reg_file.reg(idx);
-        DPRINTFV(reg_class.debug(), "Reading %s reg %s (%d) as %#x.\n",
-                reg.className(), reg_class.regName(arch_reg), idx, val);
-        return val;
-    }
-
-    void
-    getReg(const RegId &arch_reg, void *val) const override
-    {
-        const RegId reg = arch_reg.flatten(*isa);
-
-        const RegIndex idx = reg.index();
-
-        const auto &reg_file = regFiles[reg.classValue()];
-        const auto &reg_class = reg_file.regClass;
-
-        reg_file.get(idx, val);
-        DPRINTFV(reg_class.debug(), "Reading %s register %s (%d) as %s.\n",
-                reg.className(), reg_class.regName(arch_reg), idx,
-                reg_class.valString(val));
-    }
-
-    void *
-    getWritableReg(const RegId &arch_reg) override
-    {
-        const RegId reg = arch_reg.flatten(*isa);
-        const RegIndex idx = reg.index();
-        auto &reg_file = regFiles[reg.classValue()];
-
-        return reg_file.ptr(idx);
-    }
-
-    void
-    setReg(const RegId &arch_reg, RegVal val) override
-    {
         RegVal mask;    //uint64_t
         const RegId reg = arch_reg.flatten(*isa);
+
+        auto &reg_file = regFiles[reg.classValue()];
+        const auto &reg_class = reg_file.regClass;
+
         std::string type;
         static unsigned long minTicks=0, maxTicks=0;
 
@@ -399,20 +366,22 @@ class SimpleThread : public ThreadState, public ThreadContext
                 std::cout << "List of time intervals NOT empty" << std::endl;
             }
 
-            //test
+            //debug
             for (int i=0; i<NUMREGS; i++){
-                if (masksST0[i]!=0)  std::cout << i << "->ST0" << std::endl;
-                if (masksST1[i]!=0)  std::cout << i << "->ST1" << std::endl;
-                if (masksBITFLIP[i]!=0)  std::cout << i
-                    << "->BITFLIP" << std::endl;
+                if (masksST0[i]!=0)  std::cout << i << "(0x" << std::hex
+                    << masksST0[i] << ")" << " -> ST0" << std::endl;
+                if (masksST1[i]!=0)  std::cout << i << "(0x" << std::hex
+                    << masksST1[i] << ")" << " -> ST1" << std::endl;
+                if (masksBITFLIP[i]!=0)  std::cout << i << "(0x" << std::hex
+                    << masksBITFLIP[i] << ")" << " -> BITFLIP" << std::endl;
             }
         }
 
-        if (reg.is(InvalidRegClass))
-            return;
-
         mask=0;
         const RegIndex idx = reg.index();
+
+        //read the value
+        RegVal val = reg_file.reg(idx);
 
         if (noTimeIntervals || (curTick() >= minTicks
             && curTick() < maxTicks) ){
@@ -461,19 +430,55 @@ class SimpleThread : public ThreadState, public ThreadContext
             }
         }
 
+        DPRINTFV(reg_class.debug(), "Reading %s reg %s (%d) as 0x%lx, with \
+                mask 0x%lx (%s).\n", reg.className(),
+                reg_class.regName(arch_reg), idx, val, mask, type);
+
+
+        return val;
+
+    }
+
+    void
+    getReg(const RegId &arch_reg, void *val) const override
+    {
+        const RegId reg = arch_reg.flatten(*isa);
+
+        const RegIndex idx = reg.index();
+
+        const auto &reg_file = regFiles[reg.classValue()];
+        const auto &reg_class = reg_file.regClass;
+
+        reg_file.get(idx, val);
+        DPRINTFV(reg_class.debug(), "Reading %s register %s (%d) as 0x%lx.\n",
+                reg.className(), reg_class.regName(arch_reg), idx, val);
+    }
+
+    void *
+    getWritableReg(const RegId &arch_reg) override
+    {
+        const RegId reg = arch_reg.flatten(*isa);
+        const RegIndex idx = reg.index();
+        auto &reg_file = regFiles[reg.classValue()];
+
+        return reg_file.ptr(idx);
+    }
+
+    void
+    setReg(const RegId &arch_reg, RegVal val) override
+    {
+        const RegId reg = arch_reg.flatten(*isa);
+
+        if (reg.is(InvalidRegClass))
+            return;
+
+        const RegIndex idx = reg.index();
+
         auto &reg_file = regFiles[reg.classValue()];
         const auto &reg_class = reg_file.regClass;
 
-
-
-        //std::cout << "Mask before: " << std::hex << mask
-        //    << ", mask after" << std::hex << ~mask << std::endl;
-
-        DPRINTFV(reg_class.debug(), "1Setting %s register %s (%d) to 0x%lx \
-                 with mask 0x%lx (%d).\n",
-                reg.className(), reg_class.regName(arch_reg),
-                idx, val, mask, type);
-
+        DPRINTFV(reg_class.debug(), "Setting %s register %s (%d) to %#x.\n",
+                reg.className(), reg_class.regName(arch_reg), idx, val);
         reg_file.reg(idx) = val;
     }
 
@@ -487,7 +492,7 @@ class SimpleThread : public ThreadState, public ThreadContext
         auto &reg_file = regFiles[reg.classValue()];
         const auto &reg_class = reg_file.regClass;
 
-        DPRINTFV(reg_class.debug(), "2Setting %s register %s (%d) to %s.\n",
+        DPRINTFV(reg_class.debug(), "Setting %s register %s (%d) to %s.\n",
                 reg.className(), reg_class.regName(arch_reg), idx,
                 reg_class.valString(val));
         reg_file.set(idx, val);
