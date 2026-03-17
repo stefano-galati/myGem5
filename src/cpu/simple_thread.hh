@@ -389,6 +389,10 @@ class SimpleThread : public ThreadState, public ThreadContext
 
         if (noTimeIntervals || (curTick() >= minTicks
             && curTick() < maxTicks) ){
+
+            //log register read access
+            DPRINTF(FaultLogs, "Reading register %d...\n", idx);
+
             //fault injection
             if (masksST0[idx]!=0){
                 mask = static_cast<RegVal>(masksST0[idx]);
@@ -396,7 +400,6 @@ class SimpleThread : public ThreadState, public ThreadContext
                 type="ST0";
                 val = val & ~mask;
                 //std::cout << "Stuck-at-0" << std::endl;
-                DPRINTF(FaultLogs, "ST0\n");
             }
             else if (masksST1[idx]!=0){
                 mask = static_cast<RegVal>(masksST1[idx]);
@@ -404,10 +407,8 @@ class SimpleThread : public ThreadState, public ThreadContext
                 type="ST1";
                 val = val | mask;
                 //std::cout << "Stuck-at-1" << std::endl;
-                DPRINTF(FaultLogs, "ST1\n");
             }
             else if (masksBITFLIP[idx]!=0){
-                DPRINTF(FaultLogs, "BITFLIP\n");
                 if (!hasFlipped[idx]){
                     mask = static_cast<RegVal>(masksBITFLIP[idx]);
                     //bitflip
@@ -503,23 +504,24 @@ class SimpleThread : public ThreadState, public ThreadContext
 
         if (noTimeIntervals || (curTick() >= minTicks
             && curTick() < maxTicks) ){
+
+            //log register read access
+            DPRINTF(FaultLogs, "Reading register %d...\n", idx);
+
             //fault injection
             if (masksST0[idx]!=0){
                 mask = static_cast<RegVal>(masksST0[idx]);
                 //set bits to 0
                 type="ST0";
                 tmpVal = tmpVal & ~mask;
-                DPRINTF(FaultLogs, "ST0\n");
             }
             else if (masksST1[idx]!=0){
                 mask = static_cast<RegVal>(masksST1[idx]);
                 //set bits to 1
                 type="ST1";
                 tmpVal = tmpVal | mask;
-                DPRINTF(FaultLogs, "ST1\n");
             }
             else if (masksBITFLIP[idx]!=0){
-                DPRINTF(FaultLogs, "BITFLIP\n");
                 if (!hasFlipped[idx]){
                     mask = static_cast<RegVal>(masksBITFLIP[idx]);
                     //bitflip
