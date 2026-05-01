@@ -1,99 +1,68 @@
-# The gem5 Simulator
+# gem5 with Fault Injection capability
 
-This is the repository for the gem5 simulator. It contains the full source code
-for the simulator and all tests and regressions.
+This repository is a fork of the gem5 repo of february 2025 (gem5 v24.1.0.2), where faults can be injected during the simulations.
+At the moment, faults on the Register File are considered, only.
 
-The gem5 simulator is a modular platform for computer-system architecture
-research, encompassing system-level architecture as well as processor
-microarchitecture. It is primarily used to evaluate new hardware designs,
-system software changes, and compile-time and run-time system optimizations.
+## Main changes
 
-The main website can be found at <http://www.gem5.org>.
+### RegisterFaultInjector
+The `faultInjection` branch contains the commits that introduce fault injection functionality.
 
-## Testing status
+A new class, `RegisterFaultInjector`, was added to provide the following helper methods:
+* readFromFile()
+* readMasks()
+* readTimeIntervals()
 
-**Note**: These regard tests run on the develop branch of gem5:
-<https://github.com/gem5/gem5/tree/develop>.
+The .cc and .hh files are inside `src/faultInjector/RISCV`.
 
-[![Daily Tests](https://github.com/gem5/gem5/actions/workflows/daily-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/daily-tests.yaml)
-[![Weekly Tests](https://github.com/gem5/gem5/actions/workflows/weekly-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/weekly-tests.yaml)
-[![Compiler Tests](https://github.com/gem5/gem5/actions/workflows/compiler-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/compiler-tests.yaml)
+### SimpleThread
+File `src/cpu/simple_thread.hh` was modified to enable fault injection.
+This file contains the definition of the SimpleThread class, containing the `getReg` and `setReg` methods. These methods were extended so that faults can be injected during register accesses.
+The possible faults are:
+* Stuck-at-0
+* Stuck-at-1
+* Bitflip
 
-## Getting started
+## Flow
+The first time the `getReg` method is called, two configuration files are read:
+### faultTimeIntervals.txt
+This file defines the simulation time intervals (ticks) during which faults may be injected.
 
-A good starting point is <http://www.gem5.org/about>, and for
-more information about building the simulator and getting started
-please see <http://www.gem5.org/documentation> and
-<http://www.gem5.org/documentation/learning_gem5/introduction>.
+The file must contain a list of time instants, where:
 
-## Building gem5
+* odd-numbered lines represent lower bounds
+* even-numbered lines represent upper bounds
 
-To build gem5, you will need the following software: g++ or clang,
-Python (gem5 links in the Python interpreter), SCons, zlib, m4, and lastly
-protobuf if you want trace capture and playback support. Please see
-<http://www.gem5.org/documentation/general_docs/building> for more details
-concerning the minimum versions of these tools.
+For example:
+```
+100
+200
+500
+700
+```
 
-Once you have all dependencies resolved, execute
-`scons build/ALL/gem5.opt` to build an optimized version of the gem5 binary
-(`gem5.opt`) containing all gem5 ISAs. If you only wish to compile gem5 to
-include a single ISA, you can replace `ALL` with the name of the ISA. Valid
-options include `ARM`, `NULL`, `MIPS`, `POWER`, `RISCV`, `SPARC`, and `X86`
-The complete list of options can be found in the build_opts directory.
+defines the intervals:
 
-See https://www.gem5.org/documentation/general_docs/building for more
-information on building gem5.
+* [100, 200]
+* [500, 700]
 
-## The Source Tree
+Outside these intervals, the Register File behaves normally.
 
-The main source tree includes these subdirectories:
+### registerMasks.txt
+It stores the faults to be injected, using the format: `index mask type`, where:
+* Index indicates the register index
+* Mask indicates which bits to affect
+* Type can be `ST0`, `ST1` or `BITFLIP`
 
-* build_opts: pre-made default configurations for gem5
-* build_tools: tools used internally by gem5's build process.
-* configs: example simulation configuration scripts
-* ext: less-common external packages needed to build gem5
-* include: include files for use in other programs
-* site_scons: modular components of the build system
-* src: source code of the gem5 simulator. The C++ source, Python wrappers, and Python standard library are found in this directory.
-* system: source for some optional system software for simulated systems
-* tests: regression tests
-* util: useful utility programs and files
+### Fault Injection Behavior
 
-## gem5 Resources
+Whenever a register is accessed for reading, the simulator checks the accessed register index and the current simulation tick.
 
-To run full-system simulations, you may need compiled system firmware, kernel
-binaries and one or more disk images, depending on gem5's configuration and
-what type of workload you're trying to run. Many of these resources can be
-obtained from <https://resources.gem5.org>.
+If both the register and time interval match the configuration, the corresponding fault is injected.
 
-More information on gem5 Resources can be found at
-<https://www.gem5.org/documentation/general_docs/gem5_resources/>.
+Current limitation: register classes are not distinguished. Integer, floating-point, miscellaneous, and vector registers are treated only by index.
 
-## Getting Help, Reporting bugs, and Requesting Features
 
-We provide a variety of channels for users and developers to get help, report
-bugs, requests features, or engage in community discussions. Below
-are a few of the most common we recommend using.
+## FaultLogs
+If the simulation is ran with DebugFlag `FaultLogs`, the timestamps of the time instants when registers are accessed are logged. It logs only the registers being accessed in one of the time instants specified in faultTimeIntervals.txt.
 
-* **GitHub Discussions**: A GitHub Discussions page. This can be used to start
-discussions or ask questions. Available at
-<https://github.com/orgs/gem5/discussions>.
-* **GitHub Issues**: A GitHub Issues page for reporting bugs or requesting
-features. Available at <https://github.com/gem5/gem5/issues>.
-* **Jira Issue Tracker**: A Jira Issue Tracker for reporting bugs or requesting
-features. Available at <https://gem5.atlassian.net/>.
-* **Slack**: A Slack server with a variety of channels for the gem5 community
-to engage in a variety of discussions. Please visit
-<https://www.gem5.org/join-slack> to join.
-* **gem5-users@gem5.org**: A mailing list for users of gem5 to ask questions
-or start discussions. To join the mailing list please visit
-<https://www.gem5.org/mailing_lists>.
-* **gem5-dev@gem5.org**: A mailing list for developers of gem5 to ask questions
-or start discussions. To join the mailing list please visit
-<https://www.gem5.org/mailing_lists>.
-
-## Contributing to gem5
-
-We hope you enjoy using gem5. When appropriate we advise sharing your
-contributions to the project. <https://www.gem5.org/contributing> can help you
-get started. Additional information can be found in the CONTRIBUTING.md file.
