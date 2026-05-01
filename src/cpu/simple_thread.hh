@@ -131,9 +131,6 @@ class SimpleThread : public ThreadState, public ThreadContext
     //true if static fault injection (TIMEINTERVALSFILE empty or not present)
     mutable bool noTimeIntervals = true;
 
-    //so that the files is read only once
-    mutable bool filesAlreadyRead = false;
-
     //tracking if bitflip has occurred
     mutable std::vector<bool> hasFlipped = std::vector<bool>(NUMREGS, false);
 
@@ -349,38 +346,6 @@ class SimpleThread : public ThreadState, public ThreadContext
         std::string type;
         static unsigned long minTicks=0, maxTicks=0;
 
-        //read masks and fault time intervals from file
-        if (!filesAlreadyRead){
-            std::cout << "Reading time intervals..." << std::endl;
-            timeIntervals = RegisterFaultInjector
-                ::readTimeIntervals(TIMEINTERVALSFILE);
-            std::cout << "Reading ST0 masks..." << std::endl;
-            masksST0 = RegisterFaultInjector
-                ::readMasks(REGISTERMASKSFILE, NUMREGS, 0);
-            std::cout << "Reading ST1 masks..." << std::endl;
-            masksST1 = RegisterFaultInjector
-                ::readMasks(REGISTERMASKSFILE, NUMREGS, 1);
-            std::cout << "Reading BITFLIP masks..." << std::endl;
-            masksBITFLIP = RegisterFaultInjector
-                ::readMasks(REGISTERMASKSFILE, NUMREGS, 2);
-            filesAlreadyRead = true;
-
-            if (!timeIntervals.empty()){
-                noTimeIntervals=false;
-                std::cout << "List of time intervals NOT empty" << std::endl;
-            }
-
-            //debug
-            for (int i=0; i<NUMREGS; i++){
-                if (masksST0[i]!=0)  std::cout << i << "(0x" << std::hex
-                    << masksST0[i] << ")" << " -> ST0" << std::endl;
-                if (masksST1[i]!=0)  std::cout << i << "(0x" << std::hex
-                    << masksST1[i] << ")" << " -> ST1" << std::endl;
-                if (masksBITFLIP[i]!=0)  std::cout << i << "(0x" << std::hex
-                    << masksBITFLIP[i] << ")" << " -> BITFLIP" << std::endl;
-            }
-        }
-
         mask=0;
         const RegIndex idx = reg.index();
 
@@ -463,38 +428,6 @@ class SimpleThread : public ThreadState, public ThreadContext
 
         std::string type;
         static unsigned long minTicks=0, maxTicks=0;
-
-        //read masks and fault time intervals from file
-        if (!filesAlreadyRead){
-            std::cout << "Reading time intervals..." << std::endl;
-            timeIntervals = RegisterFaultInjector
-                ::readTimeIntervals(TIMEINTERVALSFILE);
-            std::cout << "Reading ST0 masks..." << std::endl;
-            masksST0 = RegisterFaultInjector
-                ::readMasks(REGISTERMASKSFILE, NUMREGS, 0);
-            std::cout << "Reading ST1 masks..." << std::endl;
-            masksST1 = RegisterFaultInjector
-                ::readMasks(REGISTERMASKSFILE, NUMREGS, 1);
-            std::cout << "Reading BITFLIP masks..." << std::endl;
-            masksBITFLIP = RegisterFaultInjector
-                ::readMasks(REGISTERMASKSFILE, NUMREGS, 2);
-            filesAlreadyRead = true;
-
-            if (!timeIntervals.empty()){
-                noTimeIntervals=false;
-                std::cout << "List of time intervals NOT empty" << std::endl;
-            }
-
-            //debug
-            for (int i=0; i<NUMREGS; i++){
-                if (masksST0[i]!=0)  std::cout << i << "(0x" << std::hex
-                    << masksST0[i] << ")" << " -> ST0" << std::endl;
-                if (masksST1[i]!=0)  std::cout << i << "(0x" << std::hex
-                    << masksST1[i] << ")" << " -> ST1" << std::endl;
-                if (masksBITFLIP[i]!=0)  std::cout << i << "(0x" << std::hex
-                    << masksBITFLIP[i] << ")" << " -> BITFLIP" << std::endl;
-            }
-        }
 
         mask=0;
         const RegIndex idx = reg.index();
@@ -613,6 +546,36 @@ class SimpleThread : public ThreadState, public ThreadContext
 
     BaseHTMCheckpointPtr& getHtmCheckpointPtr() override;
     void setHtmCheckpointPtr(BaseHTMCheckpointPtr new_cpt) override;
+
+    void faultInjectionSetup(){
+        std::cout << "Reading time intervals..." << std::endl;
+            timeIntervals = RegisterFaultInjector
+                ::readTimeIntervals(TIMEINTERVALSFILE);
+            std::cout << "Reading ST0 masks..." << std::endl;
+            masksST0 = RegisterFaultInjector
+                ::readMasks(REGISTERMASKSFILE, NUMREGS, 0);
+            std::cout << "Reading ST1 masks..." << std::endl;
+            masksST1 = RegisterFaultInjector
+                ::readMasks(REGISTERMASKSFILE, NUMREGS, 1);
+            std::cout << "Reading BITFLIP masks..." << std::endl;
+            masksBITFLIP = RegisterFaultInjector
+                ::readMasks(REGISTERMASKSFILE, NUMREGS, 2);
+
+            if (!timeIntervals.empty()){
+                noTimeIntervals=false;
+                std::cout << "List of time intervals NOT empty" << std::endl;
+            }
+
+            //debug
+            for (int i=0; i<NUMREGS; i++){
+                if (masksST0[i]!=0)  std::cout << i << "(0x" << std::hex
+                    << masksST0[i] << ")" << " -> ST0" << std::endl;
+                if (masksST1[i]!=0)  std::cout << i << "(0x" << std::hex
+                    << masksST1[i] << ")" << " -> ST1" << std::endl;
+                if (masksBITFLIP[i]!=0)  std::cout << i << "(0x" << std::hex
+                    << masksBITFLIP[i] << ")" << " -> BITFLIP" << std::endl;
+            }
+    }
 };
 
 } // namespace gem5

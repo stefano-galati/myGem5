@@ -1,7 +1,6 @@
 # gem5 with Fault Injection capability
 
-This repository is a fork of the gem5 repo of february 2025 (gem5 v24.1.0.2), where faults can be injected during the simulations.
-At the moment, faults on the Register File are considered, only.
+This repository is a fork of the gem5 repository from February 2025 (gem5 v24.1.0.2), extended with support for fault injection during simulation.
 
 ## Main changes
 
@@ -24,7 +23,8 @@ The possible faults are:
 * Bitflip
 
 ## Flow
-The first time the `getReg` method is called, two configuration files are read:
+Inside the SimpleThread's constructor, two configuration files are read:
+
 ### faultTimeIntervals.txt
 This file defines the simulation time intervals (ticks) during which faults may be injected.
 
@@ -66,3 +66,31 @@ Current limitation: register classes are not distinguished. Integer, floating-po
 ## FaultLogs
 If the simulation is ran with DebugFlag `FaultLogs`, the timestamps of the time instants when registers are accessed are logged. It logs only the registers being accessed in one of the time instants specified in faultTimeIntervals.txt.
 
+## Building gem5
+To build gem5 it is enough to run:
+```
+scons build/RISCV/gem5.opt
+```
+
+## Building the m5 library
+The m5 library can be useful if one wants to include some m5 function calls directly in the c files of the programs to be simulated. For example, one can run `m5_dump_stats(0, 0)` or `m5_exit(0)`.
+
+To do so, first:
+```
+scons build/riscv/out/m5
+```
+
+Then add this include statement in the program:
+```
+#include "gem5/m5ops.h"
+```
+
+Finally, the program can be compiled with:
+
+```
+riscv64-unknown-elf-gcc -static -o execFile.elf srcFile.c -Ipath/to/myGem5/include/ path/to/myGem5/util/m5/build/riscv/out/libm5.a
+```
+
+## Python config file
+A proper python configuration file should be passed as argument to `gem5.opt`.
+The `configs/faultInjector/minor-riscv-fault-injector.py` is the one which will be used by the fault injector described in the [Fault Injector Repository](https://github.com/stefano-galati/faultInjector).
