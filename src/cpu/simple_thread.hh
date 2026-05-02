@@ -43,6 +43,7 @@
 #define __CPU_SIMPLE_THREAD_HH__
 
 #include <algorithm>
+#include <cstring>
 #include <list>
 #include <vector>
 
@@ -335,7 +336,7 @@ class SimpleThread : public ThreadState, public ThreadContext
     }
 
     RegVal
-    getReg(const RegId &arch_reg) const override
+    getRegVal(const RegId &arch_reg) const
     {
         RegVal mask;    //uint64_t
         const RegId reg = arch_reg.flatten(*isa);
@@ -352,146 +353,87 @@ class SimpleThread : public ThreadState, public ThreadContext
         //read the value
         RegVal val = reg_file.reg(idx);
 
-        if (noTimeIntervals || (curTick() >= minTicks
-            && curTick() < maxTicks) ){
+        if (std::strcmp(reg.className(), "integer")==0){
+            if (noTimeIntervals || (curTick() >= minTicks
+                && curTick() < maxTicks) ){
 
-            //log register read access
-            DPRINTF(FaultLogs, "Reading register %d...\n", idx);
+                //log register read access
+                DPRINTF(FaultLogs, "Reading register %d...\n", idx);
 
-            //fault injection
-            if (masksST0[idx]!=0){
-                mask = static_cast<RegVal>(masksST0[idx]);
-                //set bits to 0
-                type="ST0";
-                val = val & ~mask;
-                //std::cout << "Stuck-at-0" << std::endl;
-            }
-            else if (masksST1[idx]!=0){
-                mask = static_cast<RegVal>(masksST1[idx]);
-                //set bits to 1
-                type="ST1";
-                val = val | mask;
-                //std::cout << "Stuck-at-1" << std::endl;
-            }
-            else if (masksBITFLIP[idx]!=0){
-                if (!hasFlipped[idx]){
-                    mask = static_cast<RegVal>(masksBITFLIP[idx]);
-                    //bitflip
-                    type="BITFLIP";
-                    val = val ^ mask;
-                    //std::cout << "Bitflip" << std::endl;
-                    hasFlipped[idx] = true;
+                //fault injection
+                if (masksST0[idx]!=0){
+                    mask = static_cast<RegVal>(masksST0[idx]);
+                    //set bits to 0
+                    type="ST0";
+                    val = val & ~mask;
+                    //std::cout << "Stuck-at-0" << std::endl;
                 }
+                else if (masksST1[idx]!=0){
+                    mask = static_cast<RegVal>(masksST1[idx]);
+                    //set bits to 1
+                    type="ST1";
+                    val = val | mask;
+                    //std::cout << "Stuck-at-1" << std::endl;
+                }
+                else if (masksBITFLIP[idx]!=0){
+                    if (!hasFlipped[idx]){
+                        mask = static_cast<RegVal>(masksBITFLIP[idx]);
+                        //bitflip
+                        type="BITFLIP";
+                        val = val ^ mask;
+                        //std::cout << "Bitflip" << std::endl;
+                        hasFlipped[idx] = true;
+                    }
+                }
+                //ST0 has priority, but we suppose that the input file
+                //cannot have two different masks/types associated to
+                //the same register.
+                //Only ONE of the previous three conditions is TRUE
             }
-            //ST0 has priority, but we suppose that the input file cannot have
-            //two different masks/types associated to the same register
-            //Only ONE of the previous three conditions is TRUE
-        }
-        else{
-            //this operation is not performed if noTimeIntervals=true
-            if (curTick() >= maxTicks){
-                //update values of minTicks and maxTicks
+            else{
+                //this operation is not performed if noTimeIntervals=true
+                if (curTick() >= maxTicks){
+                    //update values of minTicks and maxTicks
 
-                if (!timeIntervals.empty()){
-                    minTicks = timeIntervals.front();
-                    std::cout << "minTicks: " << minTicks;
-                    timeIntervals.pop_front();
                     if (!timeIntervals.empty()){
-                        maxTicks = timeIntervals.front();
-                        std::cout << " maxTicks: " << maxTicks << std::endl;
+                        minTicks = timeIntervals.front();
+                        std::cout << "minTicks: " << minTicks;
                         timeIntervals.pop_front();
-                    }
-                    else{
-                        std::cout << "Time intervals list did not \
-                        contain an even number of elements" << std::endl;
+                        if (!timeIntervals.empty()){
+                            maxTicks = timeIntervals.front();
+                            std::cout << " maxTicks: " << maxTicks
+                                << std::endl;
+                            timeIntervals.pop_front();
+                        }
+                        else{
+                            std::cout << "Time intervals list did not \
+                            contain an even number of elements"
+                            << std::endl;
+                        }
                     }
                 }
             }
         }
 
-        DPRINTFV(reg_class.debug(), "Reading %s reg %s (%d) as 0x%lx, with \
-                mask 0x%lx (%s).\n", reg.className(),
+        DPRINTFV(reg_class.debug(), "Reading %s register %s (%d) as 0x%lx, \
+                with mask 0x%lx (%s).\n", reg.className(),
                 reg_class.regName(arch_reg), idx, val, mask, type);
 
         return val;
+    }
 
+    RegVal
+    getReg(const RegId &arch_reg) const override
+    {
+        RegVal val = getRegVal(arch_reg);
+
+        return val;
     }
 
     void
     getReg(const RegId &arch_reg, void *val) const override
     {
-        RegVal mask;    //uint64_t
-        const RegId reg = arch_reg.flatten(*isa);
-
-        auto &reg_file = regFiles[reg.classValue()];
-        const auto &reg_class = reg_file.regClass;
-
-        std::string type;
-        static unsigned long minTicks=0, maxTicks=0;
-
-        mask=0;
-        const RegIndex idx = reg.index();
-
-        //read the value
-        RegVal tmpVal = reg_file.reg(idx);
-
-        if (noTimeIntervals || (curTick() >= minTicks
-            && curTick() < maxTicks) ){
-
-            //log register read access
-            DPRINTF(FaultLogs, "Reading register %d...\n", idx);
-
-            //fault injection
-            if (masksST0[idx]!=0){
-                mask = static_cast<RegVal>(masksST0[idx]);
-                //set bits to 0
-                type="ST0";
-                tmpVal = tmpVal & ~mask;
-            }
-            else if (masksST1[idx]!=0){
-                mask = static_cast<RegVal>(masksST1[idx]);
-                //set bits to 1
-                type="ST1";
-                tmpVal = tmpVal | mask;
-            }
-            else if (masksBITFLIP[idx]!=0){
-                if (!hasFlipped[idx]){
-                    mask = static_cast<RegVal>(masksBITFLIP[idx]);
-                    //bitflip
-                    type="BITFLIP";
-                    tmpVal = tmpVal ^ mask;
-                    hasFlipped[idx] = true;
-                }
-            }
-            //ST0 has priority, but we suppose that the input file cannot have
-            //two different masks/types associated to the same register
-            //Only ONE of the previous three conditions is TRUE
-        }
-        else{
-            //this operation is not performed if noTimeIntervals=true
-            if (curTick() >= maxTicks){
-                //update values of minTicks and maxTicks
-
-                if (!timeIntervals.empty()){
-                    minTicks = timeIntervals.front();
-                    std::cout << "minTicks: " << minTicks;
-                    timeIntervals.pop_front();
-                    if (!timeIntervals.empty()){
-                        maxTicks = timeIntervals.front();
-                        std::cout << " maxTicks: " << maxTicks << std::endl;
-                        timeIntervals.pop_front();
-                    }
-                    else{
-                        std::cout << "Time intervals list did not \
-                        contain an even number of elements" << std::endl;
-                    }
-                }
-            }
-        }
-
-        DPRINTFV(reg_class.debug(), "Reading %s reg %s (%d) as 0x%lx, with \
-                mask 0x%lx (%s).\n", reg.className(),
-                reg_class.regName(arch_reg), idx, tmpVal, mask, type);
+        RegVal tmpVal = getRegVal(arch_reg);
 
         *(RegVal*)val = tmpVal;
     }
@@ -576,6 +518,8 @@ class SimpleThread : public ThreadState, public ThreadContext
                     << masksBITFLIP[i] << ")" << " -> BITFLIP" << std::endl;
             }
     }
+
+
 };
 
 } // namespace gem5

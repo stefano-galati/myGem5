@@ -60,8 +60,7 @@ Whenever a register is accessed for reading, the simulator checks the accessed r
 
 If both the register and time interval match the configuration, the corresponding fault is injected.
 
-Current limitation: register classes are not distinguished. Integer, floating-point, miscellaneous, and vector registers are treated only by index.
-
+Current limitation: only the integer register class is considered.
 
 ## FaultLogs
 If the simulation is ran with DebugFlag `FaultLogs`, the timestamps of the time instants when registers are accessed are logged. It logs only the registers being accessed in one of the time instants specified in faultTimeIntervals.txt.

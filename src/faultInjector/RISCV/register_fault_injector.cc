@@ -53,9 +53,10 @@ namespace gem5 {
         std::string word;
 
         /*
-        The file should be organized as a N * 2 matrix, where
-        the first column is the id of the register and
+        The file should be organized as a N * 3 matrix, where
+        the first column is the id of the register,
         the second column is the mask corresponding to that specific register
+        and the third column is the fault type.
         No need to specify a mask to all the registers.
         This file has to be stored in the same folder of the
         script calling the gem5.opt
@@ -77,7 +78,7 @@ namespace gem5 {
             int index = std::stoi(word);
             file >> word;
             //std::cout << "Also: " << word << std::endl;
-            int mask = std::stoi(word, 0, 16);
+            int mask = std::stoi(word, 0, 10);
 
             file >> word;
             if (type==0 && word=="ST0"){
